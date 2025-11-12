@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>感恩的海洋</title>
+    <!-- 新增：引入二维码生成库 -->
+    <h2>看看改了没</h2>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <!-- 新增：引入LeanCloud云数据库SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+    <style>
+        /* 全局样式：沉浸式海洋氛围 */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei", "微软雅黑", sans-serif; }
+        body {
+            background: linear-gradient(160deg, #d1ecff 0%, #a8d8ff 50%, #7fc3ff 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 动态海浪背景（无图片，纯CSS动画） */
+        .ocean-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            background:
+                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 70%),
+                repeating-linear-gradient(0deg, transparent 0px, rgba(24,144,255,0.05) 2px, transparent 4px);
+            animation: oceanFlow 15s infinite linear;
+        }
+
+        /* 涟漪画布（底层动画） */
+        #gratitudeCanvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 2; }
+
+        /* 右上角图标按钮 */
+        .corner-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: #085bb2;
+            box-shadow: 0 4px 15px rgba(24, 144, 255, 0.15);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 4; /* 高于输入面板，低于弹窗 */
+        }
+        .corner-btn:hover {
+            transform: scale(1.1);
+            background: #fff;
+            box-shadow: 0 6px 20px rgba(24, 144, 255, 0.2);
+            color: #096dd9;
+        }
+        .corner-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 主容器：居中布局（输入界面） */
+        .container {
+            position: relative;
+            z-index: 3;
+            padding: 50px 20px;
+            max-width: 500px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* 主题标题：无衬线+海浪动画 */
+        .theme-title {
+            text-align: center;
+            color: #085bb2;
+            font-size: 32px;
+            font-weight: 600;
+            text-shadow: 0 3px 10px rgba(8, 91, 178, 0.15);
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .theme-desc {
+            text-align: center;
+            color: #1890ff;
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        /* 核心输入区：海浪书写面板（无表单感） */
+        .write-panel {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 25px;
+            padding: 30px;
+            box-shadow: 0 15px 40px rgba(24, 144, 255, 0.12);
+            backdrop-filter: blur(8px);
+            position: relative;
+            overflow: hidden;
+        }
+        /* 面板装饰：流动海浪线条 */
+        .write-panel::before {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #40a9ff, transparent);
+            animation: waveLine 6s infinite ease-in-out;
+        }
+        .write-panel::after {
+            content: "🌊";
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            opacity: 0.6;
+            animation: float 3s infinite ease-in-out;
+        }
+
+        /* 书写引导：替代传统标签 */
+        .write-hint {
+            color: #0a65cc;
+            font-size: 15px;
+            margin-bottom: 12px;
+            opacity: 0.8;
+        }
+
+        /* 创意输入框：海浪书写框（无边框） */
+        .wave-input {
+            width: 100%;
+            padding: 18px 22px;
+            margin-bottom: 20px;
+            background: rgba(240, 250, 255, 0.6);
+            border: none;
+            border-radius: 18px;
+            font-size: 16px;
+            color: #085bb2;
+            outline: none;
+            transition: all 0.4s ease;
+            box-shadow: inset 0 2px 8px rgba(24, 144, 255, 0.08);
+        }
+        .wave-input::placeholder {
+            color: #8cc5ff;
+            opacity: 0.8;
+            font-style: italic;
+        }
+        /* 输入时的海浪动画效果 */
+        .wave-input:focus {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 2px 10px rgba(24, 144, 255, 0.1), 0 0 0 4px rgba(24, 144, 255, 0.1);
+            animation: textFloat 4s infinite ease-in-out;
+        }
+        /* 输入分隔线：海浪形状 */
+        .input-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #e0f0ff, transparent);
+            margin: 10px 0 25px;
+            position: relative;
+        }
+        .input-divider::after {
+            content: "💧";
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: float 2s infinite ease-in-out;
+        }
+
+        /* 功能按钮组：仅保留投放按钮 */
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+        /* 投放感谢按钮 */
+        .release-btn {
+            flex: 1;
+            padding: 18px;
+            background: linear-gradient(135deg, #1890ff, #096dd9);
+            color: #fff;
+            border: none;
+            border-radius: 18px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            box-shadow: 0 6px 20px rgba(9, 109, 217, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .release-btn:hover {
+            background: linear-gradient(135deg, #096dd9, #085bb2);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(9, 109, 217, 0.4);
+        }
+        .release-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 15px rgba(9, 109, 217, 0.3);
+        }
+        /* 导出Excel按钮 */
+        .export-btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 10px;
+            background: linear-gradient(135deg, #52c41a, #389e0d);
+            color: #fff;
+            border: none;
+            border-radius: 18px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(56, 158, 13, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .export-btn:hover {
+            background: linear-gradient(135deg, #389e0d, #237804);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(56, 158, 13, 0.3);
+        }
+
+        /* 字符计数：悬浮提示（不占用表单空间） */
+        .char-hint {
+            position: absolute;
+            right: 25px;
+            font-size: 12px;
+            color: #8cc5ff;
+            opacity: 0.7;
+        }
+        .char-hint.who { top: 40px; }
+        .char-hint.msg { bottom: 145px; }
+
+        /* -------------- 新增：二维码展示区域 -------------- */
+        .qrcode-section {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 25px;
+            padding: 25px;
+            box-shadow: 0 15px 40px rgba(24, 144, 255, 0.12);
+            backdrop-filter: blur(8px);
+            text-align: center;
+        }
+        .qrcode-title {
+            color: #085bb2;
+            font-size: 18px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        .qrcode-desc {
+            color: #1890ff;
+            font-size: 14px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        #qrcodeCanvas {
+            margin: 0 auto;
+            border: 5px solid rgba(24, 144, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        /* -------------- 全屏弹幕展示界面 -------------- */
+        .showcase-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+            background: linear-gradient(160deg, #0a65cc 0%, #1890ff 50%, #40a9ff 100%);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        /* 展示界面顶部栏 */
+        .showcase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 11;
+        }
+        .showcase-title {
+            color: #fff;
+            font-size: 24px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .showcase-title::after {
+            content: "🌊";
+            animation: float 2s infinite ease-in-out;
+        }
+        .back-btn {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        /* 统计信息栏 */
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 10px 0;
+            background: rgba(255, 255, 255, 0.08);
+            color: #e6f7ff;
+            font-size: 14px;
+            z-index: 11;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+        /* 弹幕展示区域 */
+        .showcase-content {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        /* 展示界面的弹幕样式（更大更醒目） */
+        .showcase-gratitude {
+            position: absolute;
+            color: #fff;
+            font-size: 1.4rem;
+            text-shadow: 0 3px 15px rgba(0,0,0,0.2);
+            opacity: 0;
+            pointer-events: none;
+            padding: 15px 25px;
+            border-radius: 50px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05));
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            will-change: left, top, opacity, transform;
+            animation: showcaseFloatIn 1s forwards ease-out;
+        }
+        /* 展示界面背景装饰：动态气泡 */
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            opacity: 0.7;
+            animation: rise 15s infinite linear;
+        }
+
+        /* -------------- 通用组件 -------------- */
+        /* 感恩弹幕：输入界面的小弹幕 */
+        .gratitude-item {
+            position: absolute;
+            color: #fff;
+            font-size: 1.1rem;
+            text-shadow: 0 2px 10px rgba(8, 91, 178, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            padding: 12px 22px;
+            border-radius: 30px;
+            background: linear-gradient(90deg, rgba(24,144,255,0.4), rgba(9,109,217,0.2));
+            box-shadow: 0 0 20px rgba(24, 144, 255, 0.25);
+            backdrop-filter: blur(4px);
+            will-change: left, top, opacity, transform;
+            animation: floatIn 0.8s forwards ease-out;
+        }
+
+        /* 提示弹窗：气泡样式 */
+        .bubble-toast {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 14px 28px;
+            border-radius: 50px;
+            color: #fff;
+            font-size: 16px;
+            z-index: 9999;
+            opacity: 0;
+            transform: translate(-50%, -20px);
+            transition: all 0.5s ease;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .bubble-toast.success {
+            background: linear-gradient(90deg, #52c41a, #389e0d);
+        }
+        .bubble-toast.warning {
+            background: linear-gradient(90deg, #faad14, #fa8c16);
+        }
+        .bubble-toast.error {
+            background: linear-gradient(90deg, #ff4d4f, #d9363e);
+        }
+        .bubble-toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        /* 动画关键帧 */
+        @keyframes oceanFlow {
+            0% { background-position: 0 0; }
+            100% { background-position: 1000px 1000px; }
+        }
+        @keyframes waveLine {
+            0%, 100% { transform: translateX(-50%); }
+            50% { transform: translateX(50%); }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        @keyframes textFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+        @keyframes floatIn {
+            0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+            100% { opacity: 0.95; transform: translateY(0) scale(1); }
+        }
+        @keyframes showcaseFloatIn {
+            0% { opacity: 0; transform: translateY(30px) scale(0.8); }
+            100% { opacity: 0.9; transform: translateY(0) scale(1); }
+        }
+        @keyframes rise {
+            0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
+            10% { opacity: 0.7; }
+            90% { opacity: 0.3; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-5px); }
+            40% { transform: translateX(5px); }
+            60% { transform: translateX(-3px); }
+            80% { transform: translateX(3px); }
+        }
+
+        /* 移动端适配优化 */
+        @media (max-width: 480px) {
+            .theme-title { font-size: 28px; }
+            .write-panel { padding: 25px 20px; }
+            .wave-input { padding: 16px 18px; font-size: 15px; }
+            .qrcode-section { padding: 20px 15px; }
+            #qrcodeCanvas { width: 180px; height: 180px; }
+        }
+    </style>
+</head>
+<body>
+<div class="ocean-bg"></div>
+<canvas id="gratitudeCanvas"></canvas>
+
+<!-- 右上角查看图标按钮 -->
+<button class="corner-btn" id="viewBtn" title="查看感恩海洋">👀</button>
+
+<!-- 输入界面 -->
+<div class="container">
+    <h1 class="theme-title">感恩的海洋</h1>
+    <p class="theme-desc">在海浪上书写感谢，让善意随波涛传递</p>
+
+    <!-- 核心输入区：海浪书写面板 -->
+    <div class="write-panel">
+        <!-- 字符计数提示 -->
+        <span class="char-hint who" id="whoCount">0/22</span>
+        <span class="char-hint msg" id="msgCount">0/40</span>
+
+        <!-- 第一个输入：想感谢的人（无标签，用引导文字） -->
+        <p class="write-hint">想把感谢送给谁？（可留白）</p>
+        <input
+                type="text"
+                class="wave-input"
+                id="who"
+                placeholder="比如：父母、老师、并肩的伙伴..."
+                maxlength="22"
+        >
+
+        <!-- 海浪分隔线 -->
+        <div class="input-divider"></div>
+
+        <!-- 第二个输入：感谢的话（核心输入） -->
+        <p class="write-hint">写下你心底的感谢...</p>
+        <input
+                type="text"
+                class="wave-input"
+                id="msg"
+                placeholder="一句真挚的话，就能温暖整个海洋～"
+                maxlength="40"
+        >
+
+        <!-- 功能按钮组：仅保留投放按钮 -->
+        <div class="btn-group">
+            <button type="button" class="release-btn" id="releaseBtn">投放感谢 🌊</button>
+        </div>
+
+        <!-- 导出Excel按钮 -->
+        <button type="button" class="export-btn" id="exportBtn">导出Excel数据 📊</button>
+    </div>
+
+    <!-- 新增：二维码展示区域 -->
+    <div class="qrcode-section">
+        <h3 class="qrcode-title">扫码手机填写 📱</h3>
+        <p class="qrcode-desc">扫描下方二维码，在手机上提交感谢（实时同步到屏幕）</p>
+        <canvas id="qrcodeCanvas" width="200" height="200"></canvas>
+    </div>
+</div>
+
+<!-- 全屏弹幕展示界面 -->
+<div class="showcase-container" id="showcaseContainer">
+    <div class="showcase-header">
+        <h2 class="showcase-title">感恩的海洋 · 全景展示</h2>
+        <button class="back-btn" id="backBtn">返回书写</button>
+    </div>
+    <div class="stats-bar">
+        <div class="stat-item">总感谢数：<span class="stat-value" id="totalCount">0</span></div>
+        <div class="stat-item">最新提交：<span class="stat-value" id="latestTime">暂无</span></div>
+    </div>
+    <div class="showcase-content" id="showcaseContent"></div>
+</div>
+
+<!-- 气泡提示 -->
+<div class="bubble-toast" id="toast"></div>
+
+<script>
+    // ================== 1. 基础配置（必须修改！）===================
+    // 1.1 LeanCloud云数据库配置（替换为你的LeanCloud AppID、AppKey、服务器地址）
+    const LEANCLOUD_CONFIG = {
+        appId: "SBpOzHNBRBVEROKU5GhwtNPl-gzGzoHsz",
+        appKey: "NdU8hjwV0ym4XtsWlBd777FM",
+        serverURL: "https://sbpozhnb.lc-cn-n1-shared.com"
+    };
+    // 1.2 二维码指向的URL
+    const MOBILE_URL = "https://JW-Demo12138.github.io";
+
+    // ================== 2. 初始化依赖 ===================
+    const toast = document.getElementById('toast');
+    const whoInput = document.getElementById('who');
+    const msgInput = document.getElementById('msg');
+    const releaseBtn = document.getElementById('releaseBtn');
+    const viewBtn = document.getElementById('viewBtn');
+    const backBtn = document.getElementById('backBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const showcaseContainer = document.getElementById('showcaseContainer');
+    const showcaseContent = document.getElementById('showcaseContent');
+    const totalCountEl = document.getElementById('totalCount');
+    const latestTimeEl = document.getElementById('latestTime');
+    const whoCount = document.getElementById('whoCount');
+    const msgCount = document.getElementById('msgCount');
+    const qrcodeCanvas = document.getElementById('qrcodeCanvas');
+
+    // 初始化LeanCloud
+    try {
+        AV.init(LEANCLOUD_CONFIG);
+        showToast('云数据库连接成功～', 'success');
+    } catch (error) {
+        showToast('云数据库初始化失败，请检查配置', 'error');
+        console.error('LeanCloud初始化错误：', error);
+    }
+
+    // 生成二维码
+    try {
+        QRCode.toCanvas(qrcodeCanvas, MOBILE_URL, {
+            width: 200,
+            margin: 1,
+            color: {
+                dark: '#085bb2',
+                light: '#ffffff'
+            }
+        }, (error) => {
+            if (error) {
+                showToast('二维码生成失败', 'error');
+                console.error('二维码错误：', error);
+            }
+        });
+    } catch (error) {
+        showToast('二维码生成失败', 'error');
+    }
+
+    // ================== 3. 工具函数 ===================
+    // 气泡提示
+    function showToast(message, type = 'success') {
+        toast.textContent = message;
+        toast.className = `bubble-toast ${type}`;
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2500);
+    }
+
+    // 实时字符计数
+    function updateCharCount(input, countElement, maxLength) {
+        const length = input.value.length;
+        countElement.textContent = `${length}/${maxLength}`;
+        if (length > maxLength * 0.8) {
+            countElement.style.color = '#ff8c8c';
+            countElement.style.opacity = '1';
+        } else {
+            countElement.style.color = '#8cc5ff';
+            countElement.style.opacity = '0.7';
+        }
+    }
+    whoInput.addEventListener('input', () => updateCharCount(whoInput, whoCount, 22));
+    msgInput.addEventListener('input', () => updateCharCount(msgInput, msgCount, 40));
+
+    // 格式化时间
+    function formatTime(timestamp) {
+        const date = new Date(timestamp);
+        return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
+    }
+
+    // ================== 4. 云数据库数据管理（替换localStorage）===================
+    // 获取所有感谢数据（从云数据库拉取）
+    async function getGratitudeData() {
+        try {
+            const query = new AV.Query('gratitude');
+            query.descending('createdAt'); // 按提交时间倒序
+            const results = await query.find();
+            return results.map(item => ({
+                id: item.id,
+                who: item.get('who') || '',
+                msg: item.get('msg') || '',
+                timestamp: item.get('createdAt').getTime()
+            }));
+        } catch (error) {
+            showToast('数据获取失败', 'error');
+            console.error('获取数据错误：', error);
+            return [];
+        }
+    }
+
+    // 添加新的感谢数据（提交到云数据库）
+    async function addGratitudeData(who, msg) {
+        try {
+            const Gratitude = AV.Object.extend('gratitude');
+            const gratitude = new Gratitude();
+            gratitude.set('who', who.trim());
+            gratitude.set('msg', msg.trim());
+            await gratitude.save(); // 保存到云数据库
+            return {
+                id: gratitude.id,
+                who: who.trim(),
+                msg: msg.trim(),
+                timestamp: gratitude.get('createdAt').getTime()
+            };
+        } catch (error) {
+            showToast('提交失败，请重试', 'error');
+            console.error('提交数据错误：', error);
+            return null;
+        }
+    }
+
+    // 更新统计信息
+    async function updateStats() {
+        const data = await getGratitudeData();
+        totalCountEl.textContent = data.length;
+        if (data.length > 0) {
+            const latest = data[data.length - 1];
+            latestTimeEl.textContent = formatTime(latest.timestamp);
+        } else {
+            latestTimeEl.textContent = '暂无';
+        }
+    }
+
+    // 定时拉取新数据（每3秒刷新一次，实现实时同步）
+    setInterval(async () => {
+        const data = await getGratitudeData();
+        updateStats();
+        // 如果当前在展示界面，刷新弹幕
+        if (showcaseContainer.style.display === 'flex') {
+            renderShowcaseGratitudes();
+        }
+    }, 3000);
+
+    // ================== 5. Excel导出功能（从云数据库拉取数据）===================
+    async function exportToExcel() {
+        const data = await getGratitudeData();
+        if (data.length === 0) {
+            showToast('暂无数据可导出～', 'warning');
+            return;
+        }
+
+        // 构造CSV表头和内容
+        const header = 'ID,感谢对象,感谢内容,提交时间\n';
+        const content = data.map(item => {
+            const who = item.who.replace(/"/g, '""').replace(/,/g, '，');
+            const msg = item.msg.replace(/"/g, '""').replace(/,/g, '，');
+            return `"${item.id}","${who}","${msg}","${formatTime(item.timestamp)}"`;
+        }).join('\n');
+
+        // 生成CSV文件（UTF-8 BOM，避免Excel乱码）
+        const csvContent = '\uFEFF' + header + content;
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `感恩海洋数据_${formatTime(Date.now()).replace(/[: ]/g, '-')}.csv`;
+        a.click();
+
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        showToast('Excel数据导出成功！');
+    }
+
+    // ================== 6. 涟漪动画 ===================
+    const canvas = document.getElementById('gratitudeCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 画布自适应
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.onresize = resizeCanvas;
+    resizeCanvas();
+
+    let ripples = [];
+    function addRipple(x, y, color = 'rgba(24,144,255,0.4)', size = 15, speed = 2) {
+        ripples.push({ x, y, r: size, alpha: 0.8, color, speed });
+    }
+    function drawRipples() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const r of ripples) {
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, r.r, 0, 2 * Math.PI);
+            const color = r.color.replace(/0\.\d+/, r.alpha.toFixed(2));
+            ctx.strokeStyle = color;
+            ctx.lineWidth = Math.max(0.5, 6 - r.r / 40);
+            ctx.stroke();
+            r.r += r.speed;
+            r.alpha *= 0.95;
+        }
+        ripples = ripples.filter(r => r.alpha > 0.1);
+    }
+    // 背景自动生成海浪涟漪
+    setInterval(() => {
+        const rx = Math.random() * canvas.width;
+        const ry = Math.random() * canvas.height;
+        const speed = 1.5 + Math.random() * 1;
+        const alpha = 0.15 + Math.random() * 0.1;
+        addRipple(rx, ry, `rgba(24,144,255,${alpha})`, 10, speed);
+    }, 600);
+    // 点击背景触发涟漪互动
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.write-panel') && !e.target.closest('.bubble-toast') && !e.target.closest('.showcase-container') && !e.target.closest('.corner-btn')) {
+            addRipple(e.clientX, e.clientY, 'rgba(255,255,255,0.5)', 8, 1.8);
+        }
+    });
+
+    // ================== 7. 输入界面弹幕功能 ===================
+    let gratitudeList = [];
+
+    // 投放感谢（核心逻辑）
+    async function releaseGratitude() {
+        const who = whoInput.value.trim();
+        const msg = msgInput.value.trim();
+
+        // 校验：感谢的话必填
+        if (!msg) {
+            showToast('请写下你想表达的感谢～', 'warning');
+            msgInput.style.animation = 'shake 0.5s ease';
+            setTimeout(() => msgInput.style.animation = '', 500);
+            return;
+        }
+
+        // 提交到云数据库
+        const newData = await addGratitudeData(who, msg);
+        if (!newData) return;
+
+        // 生成感谢文本
+        const content = who ? `致 ${who}：${msg}` : msg;
+        const maxW = window.innerWidth;
+        const maxH = window.innerHeight;
+
+        // 随机初始位置（避免超出屏幕）
+        const initX = Math.random() * (maxW - 320) + 60;
+        const initY = Math.random() * (maxH - 220) + 80;
+
+        // 创建漂浮的感谢元素
+        const gratitudeEl = document.createElement('div');
+        gratitudeEl.className = 'gratitude-item';
+        gratitudeEl.textContent = content;
+        gratitudeEl.style.left = `${initX}px`;
+        gratitudeEl.style.top = `${initY}px`;
+        document.body.appendChild(gratitudeEl);
+
+        // 存储感谢数据（用于动画更新）
+        gratitudeList.push({
+            id: newData.id,
+            element: gratitudeEl,
+            x: initX,
+            y: initY,
+            life: 50 + Math.random() * 50, // 5~10秒生命周期
+            floatX: (Math.random() - 0.5) * 1.2,
+            floatY: (Math.random() - 0.5) * 0.8
+        });
+
+        // 触发投放涟漪
+        addRipple(initX + 40, initY + 20, 'rgba(255,255,255,0.6)', 12, 2.5);
+        setTimeout(() => addRipple(initX + 20, initY + 30, 'rgba(136, 204, 255, 0.7)', 15, 2), 150);
+        setTimeout(() => addRipple(initX + 50, initY + 10, 'rgba(24,144,255,0.5)', 18, 1.8), 300);
+
+        // 提示成功
+        showToast('感谢已随海浪出发～');
+
+        // 清空输入框+重置计数
+        whoInput.value = '';
+        msgInput.value = '';
+        updateCharCount(whoInput, whoCount, 22);
+        updateCharCount(msgInput, msgCount, 40);
+
+        // 按钮反馈动画
+        releaseBtn.style.transform = 'scale(0.95)';
+        setTimeout(() => releaseBtn.style.transform = '', 200);
+    }
+
+    // 更新感谢漂浮动画
+    function updateGratitudes() {
+        gratitudeList.forEach((item, index) => {
+            if (item.life <= 0) {
+                // 消失动画：淡出+上浮
+                item.element.style.opacity = 0;
+                item.element.style.transform = 'translateY(-15px)';
+                setTimeout(() => item.element.remove(), 500);
+                gratitudeList.splice(index, 1);
+                return;
+            }
+
+            // 自然漂浮
+            const waveX = Math.sin(item.life / 8) * 10;
+            const waveY = Math.cos(item.life / 12) * 8;
+            const newX = item.x + waveX + item.floatX;
+            const newY = item.y + waveY + item.floatY;
+
+            // 更新位置和透明度
+            item.element.style.left = `${newX}px`;
+            item.element.style.top = `${newY}px`;
+            item.element.style.opacity = Math.max(item.life / 60, 0.2);
+
+            // 减少生命周期
+            item.life -= 0.1;
+        });
+    }
+    setInterval(updateGratitudes, 50);
+
+    // ================== 8. 全屏弹幕展示功能（慢速版）===================
+    // 展示界面背景气泡生成
+    function createBubbles(count = 30) {
+        const content = document.getElementById('showcaseContent');
+        for (let i = 0; i < count; i++) {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            const size = 10 + Math.random() * 50;
+            const left = Math.random() * 100;
+            const delay = Math.random() * 10;
+            bubble.style.width = `${size}px`;
+            bubble.style.height = `${size}px`;
+            bubble.style.left = `${left}%`;
+            bubble.style.animationDelay = `${delay}s`;
+            content.appendChild(bubble);
+        }
+    }
+    // 初始化展示界面气泡
+    createBubbles();
+
+    // 渲染展示界面的弹幕
+    async function renderShowcaseGratitudes() {
+        const content = document.getElementById('showcaseContent');
+        const data = await getGratitudeData();
+        const maxW = window.innerWidth;
+        const maxH = window.innerHeight;
+
+        // 清空现有弹幕（保留气泡）
+        const existingGratitudes = content.querySelectorAll('.showcase-gratitude');
+        existingGratitudes.forEach(el => el.remove());
+
+        // 渲染所有感谢数据
+        data.forEach((item, index) => {
+            const contentText = item.who ? `致 ${item.who}：${item.msg}` : item.msg;
+            const gratitudeEl = document.createElement('div');
+            gratitudeEl.className = 'showcase-gratitude';
+            gratitudeEl.textContent = contentText;
+
+            // 随机位置（均匀分布）
+            const initX = Math.random() * (maxW - 350) + 50;
+            const initY = Math.random() * (maxH - 200) + 100;
+            gratitudeEl.style.left = `${initX}px`;
+            gratitudeEl.style.top = `${initY}px`;
+            // 错开动画延迟，避免同时出现
+            gratitudeEl.style.animationDelay = `${index * 0.1}s`;
+
+            content.appendChild(gratitudeEl);
+
+            // 弹幕漂浮动画（慢速版）
+            animateShowcaseGratitude(gratitudeEl, initX, initY);
+        });
+    }
+
+    // 展示界面弹幕漂浮动画（循环流动-慢速）
+    function animateShowcaseGratitude(el, initX, initY) {
+        const maxW = window.innerWidth;
+        const maxH = window.innerHeight;
+        let life = 150 + Math.random() * 150; // 15~30秒生命周期（延长）
+        let floatX = (Math.random() - 0.5) * 0.8; // 横向速度减慢
+        let floatY = (Math.random() - 0.5) * 0.6; // 纵向速度减慢
+
+        function update() {
+            if (life <= 0) {
+                // 重置位置和生命周期
+                el.style.left = `${Math.random() * (maxW - 350) + 50}px`;
+                el.style.top = `${Math.random() * (maxH - 200) + 100}px`;
+                el.style.opacity = 0.9;
+                life = 150 + Math.random() * 150;
+                floatX = (Math.random() - 0.5) * 0.8;
+                floatY = (Math.random() - 0.5) * 0.6;
+            }
+
+            // 波浪式漂浮（频率减慢）
+            const waveX = Math.sin(life / 15) * 12;
+            const waveY = Math.cos(life / 20) * 8;
+            const currentX = parseFloat(el.style.left) + waveX + floatX;
+            const currentY = parseFloat(el.style.top) + waveY + floatY;
+
+            // 边界检测：超出屏幕则反弹
+            if (currentX < 50 || currentX > maxW - 300) floatX *= -1;
+            if (currentY < 100 || currentY > maxH - 100) floatY *= -1;
+
+            // 更新位置和透明度
+            el.style.left = `${currentX}px`;
+            el.style.top = `${currentY}px`;
+            el.style.opacity = Math.max(life / 180, 0.3);
+
+            // 减慢生命周期消耗
+            life -= 0.15;
+            requestAnimationFrame(update);
+        }
+
+        update();
+    }
+
+    // 切换到展示界面
+    async function openShowcase() {
+        showcaseContainer.style.display = 'flex';
+        // 渲染弹幕和更新统计
+        await updateStats();
+        await renderShowcaseGratitudes();
+        // 暂停输入界面的涟漪动画
+        canvas.style.display = 'none';
+    }
+
+    // 切换回输入界面
+    function closeShowcase() {
+        showcaseContainer.style.display = 'none';
+        // 恢复涟漪动画
+        canvas.style.display = 'block';
+        resizeCanvas();
+    }
+
+    // ================== 9. 事件绑定 ===================
+    // 投放感谢
+    releaseBtn.addEventListener('click', releaseGratitude);
+    [whoInput, msgInput].forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') releaseGratitude();
+        });
+    });
+
+    // 右上角图标按钮：打开展示界面
+    viewBtn.addEventListener('click', openShowcase);
+
+    // 返回输入界面
+    backBtn.addEventListener('click', closeShowcase);
+
+    // 导出Excel
+    exportBtn.addEventListener('click', exportToExcel);
+
+    // ================== 10. 初始化 ===================
+    // 页面加载时更新统计
+    window.onload = async () => {
+        await updateStats();
+    };
+
+    // 动画主循环
+    function animate() {
+        drawRipples();
+        requestAnimationFrame(animate);
+    }
+    animate();
+</script>
+</body>
+</html>
+
+// 🔴 纯并发版本的批量执行函数（50人瞬间提交）
+async function runWriteTest() {
+console.log(`🎬 开始纯并发测试：${TEST_CONFIG.totalUsers}人同时提交`);
+let successCount = 0;
+let failCount = 0;
+const totalCosts = [];
+
+// 所有请求同时发起（无间隔）
+const submitPromises = [];
+for (let i = 1; i <= TEST_CONFIG.totalUsers; i++) {
+const { who, msg } = getRandomTestData(i);
+submitPromises.push(
+submitWithRetry(who, msg, TEST_CONFIG.retryTimes).then(result => {
+if (result.success) {
+successCount++;
+totalCosts.push(result.costTime);
+console.log(`✅ 第${i}人提交成功 | 耗时：${result.costTime}ms`);
+} else {
+failCount++;
+console.error(`❌ 第${i}人提交失败 | 原因：${result.errorMsg}`);
+}
+})
+);
+}
+
+// 等待所有请求完成
+await Promise.all(submitPromises);
+
+// 📊 输出总结（和原脚本一致）
+const avgCost = totalCosts.length > 0 ? (totalCosts.reduce((a, b) => a + b) / totalCosts.length).toFixed(1) : 0;
+console.log("\n======================================");
+console.log(`📈 纯并发测试完成！`);
+console.log(`总提交数：${TEST_CONFIG.totalUsers}`);
+console.log(`成功数：${successCount}（成功率：${(successCount / TEST_CONFIG.totalUsers * 100).toFixed(1)}%）`);
+console.log(`平均提交耗时：${avgCost}ms`);
+console.log(`======================================`);
+}
