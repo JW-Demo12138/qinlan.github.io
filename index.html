@@ -381,13 +381,52 @@
             100% { opacity: 0; transform: scale(0.8); }
         }
 
-        /* 展示界面背景装饰：动态气泡 */
-        .bubble {
+        /* -------------- 第二页气泡效果 -------------- */
+        .bubbles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9; /* 在背景之上，弹幕之下 */
+            pointer-events: none; /* 确保不会干扰交互 */
+        }
+
+        .bubble-element {
             position: absolute;
+            bottom: -100px; /* 初始位置在屏幕下方 */
+            background: rgba(255, 255, 255, 0.15); /* 半透明白色 */
+            border-radius: 50%; /* 圆形 */
+            animation: bubbleRise linear infinite; /* 使用rise动画，线性，无限循环 */
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.4); /* 添加光晕效果 */
+        }
+
+        .bubble-element::before {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 20%;
+            width: 20%;
+            height: 20%;
+            background: rgba(255, 255, 255, 0.4);
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            opacity: 0.7;
-            animation: rise 15s infinite linear;
+        }
+
+        @keyframes bubbleRise {
+            0% {
+                transform: translateY(0) scale(1); /* 初始位置和大小 */
+                opacity: 0; /* 初始完全透明 */
+            }
+            10% {
+                opacity: 0.7; /* 快速变为可见 */
+            }
+            90% {
+                opacity: 0.3; /* 上升过程中逐渐变淡 */
+            }
+            100% {
+                transform: translateY(-100vh) scale(1.5); /* 上升到屏幕顶部并放大 */
+                opacity: 0; /* 最终完全透明 */
+            }
         }
 
         /* -------------- 通用组件 -------------- */
@@ -458,12 +497,6 @@
         @keyframes floatIn {
             0% { opacity: 0; transform: translateY(20px) scale(0.9); }
             100% { opacity: 0.95; transform: translateY(0) scale(1); }
-        }
-        @keyframes rise {
-            0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
-            10% { opacity: 0.7; }
-            90% { opacity: 0.3; }
-            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
         }
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
@@ -638,16 +671,19 @@
         <button type="button" class="export-btn" id="exportBtn">导出Excel数据 📊</button>
     </div>
 
-    <!-- 新增：二维码展示区域 -->
-    <div class="qrcode-section">
+    <!-- 新增：二维码展示区域  -->
+    <!-- <div class="qrcode-section">
         <h3 class="qrcode-title">扫码手机填写 📱</h3>
         <p class="qrcode-desc">扫描下方二维码，在手机上提交感谢（实时同步到屏幕）</p>
         <canvas id="qrcodeCanvas" width="200" height="200"></canvas>
-    </div>
+    </div> -->
+
 </div>
 
 <!-- 全屏弹幕展示界面 -->
 <div class="showcase-container" id="showcaseContainer">
+    <!-- 新增：气泡容器 -->
+    <div class="bubbles-container" id="bubblesContainer"></div>
     <canvas id="showcaseCanvas"></canvas>
     <div class="showcase-header">
         <h2 class="showcase-title">感恩的海洋 · 全景展示</h2>
@@ -690,7 +726,7 @@
         serverURL: "https://sbpozhnb.lc-cn-n1-shared.com"
     };
     // 1.2 二维码指向的URL
-    const MOBILE_URL = "https://JW-Demo12138.github.io";
+    const MOBILE_URL = "https://JW-Demo12138.github.io/qinlan/";
 
     // 配置参数 - 可根据需要调整
     const CONFIG = {
@@ -737,11 +773,15 @@
     const showcaseCanvas = document.getElementById('showcaseCanvas');
     const showcaseCtx = showcaseCanvas.getContext('2d');
 
+    // 新增：气泡容器
+    const bubblesContainer = document.getElementById('bubblesContainer');
+
     // 全局状态变量
     let showcaseRippleInterval = null;
     let activeShowcaseItems = []; // 跟踪当前显示的弹幕
     let showcaseItemCount = 0; // 当前3秒内生成的弹幕计数
     let countResetTimer = null; // 计数重置定时器
+    let bubbleInterval = null; // 气泡生成间隔
 
     // 初始化LeanCloud
     try {
@@ -1035,6 +1075,65 @@
         }
     });
 
+    // ================== 气泡效果 ===================
+    // 创建单个气泡
+    function createBubble() {
+        // 创建气泡元素
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble-element';
+        
+        // 随机设置气泡大小 (20px 到 80px)
+        const size = Math.random() * 60 + 20;
+        bubble.style.width = `${size}px`;
+        bubble.style.height = `${size}px`;
+        
+        // 随机设置气泡水平位置 (0% 到 100%)
+        const left = Math.random() * 100;
+        bubble.style.left = `${left}%`;
+        
+        // 随机设置动画时长 (10秒 到 25秒)
+        const duration = Math.random() * 15 + 10;
+        bubble.style.animationDuration = `${duration}s`;
+        
+        // 随机设置动画延迟 (0秒 到 5秒)
+        const delay = Math.random() * 5;
+        bubble.style.animationDelay = `${delay}s`;
+        
+        // 将气泡添加到容器中
+        bubblesContainer.appendChild(bubble);
+        
+        // 动画结束后移除气泡元素，防止DOM过度增长
+        setTimeout(() => {
+            // 检查气泡是否仍在DOM中
+            if (bubble.parentNode) {
+                bubble.remove();
+            }
+        }, (duration + delay) * 1000); // 总时间 = 动画时长 + 延迟
+    }
+    
+    // 持续生成气泡
+    function generateBubbles() {
+        if (showcaseContainer.style.display !== 'flex') return;
+        
+        createBubble(); // 创建一个气泡
+        
+        // 设置下一个气泡的生成时间 (200ms 到 700ms 后)
+        setTimeout(generateBubbles, Math.random() * 500 + 200);
+    }
+    
+    // 启动气泡生成
+    function startBubbles() {
+        // 先清空可能存在的旧气泡
+        bubblesContainer.innerHTML = '';
+        // 立即开始生成气泡
+        generateBubbles();
+    }
+    
+    // 停止气泡生成（清空所有气泡）
+    function stopBubbles() {
+        bubblesContainer.innerHTML = '';
+    }
+
     // ================== 输入界面弹幕功能 ===================
     let gratitudeList = [];
 
@@ -1239,6 +1338,7 @@
         updateStats();
         startShowcaseRipples();
         showcaseInterval = startShowcaseInterval();
+        startBubbles(); // 启动气泡效果
     });
 
     // 返回输入界面
@@ -1246,6 +1346,7 @@
         showcaseContainer.style.display = 'none';
         stopShowcaseRipples();
         clearInterval(showcaseInterval);
+        stopBubbles(); // 停止气泡效果
         // 清空展示界面弹幕
         showcaseContent.innerHTML = '';
         activeShowcaseItems = [];
